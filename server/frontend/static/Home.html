@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Car Dealerships Portal</title>
+
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+
+<body class="container mt-4">
+
+<!-- NAVBAR -->
+<nav class="navbar navbar-expand-lg navbar-light bg-light mb-4 px-3 d-flex justify-content-between">
+    <div>
+        <a href="#"
+           onclick="showSection('dealers-section')"
+           class="navbar-brand">
+            Car Dealerships
+        </a>
+
+        <a href="/djangoapp/about/"
+           class="me-3 text-decoration-none">
+            About Us
+        </a>
+
+        <a href="/djangoapp/contact/"
+           class="text-decoration-none">
+            Contact Us
+        </a>
+    </div>
+
+    <div id="auth-status">
+        <button class="btn btn-outline-primary btn-sm"
+                onclick="showSection('login-section')">
+            Login
+        </button>
+    </div>
+</nav>
+
+
+<!-- DEALERS SECTION -->
+<div id="dealers-section" class="view-section">
+
+    <h1 class="mb-4">Our Dealerships</h1>
+
+    <div class="mb-4 d-flex align-items-center gap-2"
+         style="max-width:300px;">
+
+        <label class="form-label mb-0 fw-bold">
+            Filter by State:
+        </label>
+
+        <select id="state-filter"
+                class="form-select"
+                onchange="handleStateChange(this.value)">
+
+            <option value="">All States</option>
+            <option value="New York">New York</option>
+            <option value="Kansas">Kansas</option>
+            <option value="California">California</option>
+        </select>
+    </div>
+
+    <table class="table table-striped table-bordered">
+        <thead class="table-dark">
+        <tr>
+            <th>ID</th>
+            <th>Dealer Name</th>
+            <th>City</th>
+        </tr>
+        </thead>
+
+        <tbody id="dealers-table-body"></tbody>
+    </table>
+
+</div>
+
+
+<!-- REVIEWS SECTION -->
+<div id="reviews-section"
+     class="view-section d-none">
+
+    <button class="btn btn-secondary btn-sm mb-3"
+            onclick="showSection('dealers-section')">
+        ← Back to Dealers
+    </button>
+
+    <button class="btn btn-success btn-sm mb-3 ms-2"
+            onclick="showSection('add-review-section')">
+        + Add Review
+    </button>
+
+    <h2 id="dealer-name-title" class="mb-3">
+        Dealer Reviews
+    </h2>
+
+    <div id="reviews-list" class="row"></div>
+</div>
+
+
+<!-- LOGIN SECTION -->
+<div id="login-section"
+     class="view-section d-none"
+     style="max-width:400px;margin:0 auto;">
+
+    <h3 class="mb-3">Login to Your Account</h3>
+
+    <div class="mb-3">
+        <label class="form-label">
+            Username
+        </label>
+
+        <input type="text"
+               id="username"
+               class="form-control">
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">
+            Password
+        </label>
+
+        <input type="password"
+               id="password"
+               class="form-control">
+    </div>
+
+    <button class="btn btn-primary w-100"
+            onclick="handleLogin()">
+        Login
+    </button>
+
+    <button class="btn btn-link w-100 mt-2 text-secondary"
+            onclick="showSection('dealers-section')">
+        Cancel
+    </button>
+
+</div>
+
+
+<!-- ADD REVIEW SECTION -->
+<div id="add-review-section"
+     class="view-section d-none"
+     style="max-width:500px;margin:0 auto;">
+
+    <button class="btn btn-secondary btn-sm mb-3"
+            onclick="showSection('reviews-section')">
+        ← Back to Reviews
+    </button>
+
+    <h3 class="mb-3">
+        Post a New Review
+    </h3>
+
+    <div class="mb-3">
+        <label class="form-label fw-bold">
+            Your Name
+        </label>
+
+        <input type="text"
+               id="reviewer-name"
+               class="form-control">
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label fw-bold">
+            Review Content
+        </label>
+
+        <textarea id="reviewer-text"
+                  class="form-control"
+                  rows="4"></textarea>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label fw-bold">
+            Purchase Date
+        </label>
+
+        <input type="date"
+               id="purchase-date"
+               class="form-control">
+    </div>
+
+    <button class="btn btn-primary w-100"
+        onclick="submitNewReview()">
+    Submit Review
+</button>
+
+</div>
+
+
+<script>
+
+let currentDealerId = null;
+
+
+/* ===========================
+   SECTION SWITCHING
+=========================== */
+function showSection(sectionId) {
+
+    document.querySelectorAll(".view-section")
+        .forEach(section => section.classList.add("d-none"));
+
+    document.getElementById(sectionId)
+        .classList.remove("d-none");
+}
+
+
+/* ===========================
+   FETCH DEALERS
+=========================== */
+async function fetchDealers(state="") {
+
+    try {
+
+        const url = state
+            ? `/djangoapp/get_dealers?state=${state}`
+            : `/djangoapp/get_dealers`;
+
+        const response = await fetch(url);
+
+        const dealers = await response.json();
+
+        const tableBody =
+            document.getElementById("dealers-table-body");
+
+        tableBody.innerHTML = "";
+
+        const filteredDealers = state
+            ? dealers.filter(
+                d => d.state === state || d.city === state
+              )
+            : dealers;
+
+        if(filteredDealers.length === 0){
+            tableBody.innerHTML =
+                `<tr>
+                    <td colspan="3" class="text-center text-muted">
+                        No dealers found in ${state}
+                    </td>
+                 </tr>`;
+            return;
+        }
+
+        filteredDealers.forEach(dealer => {
+
+            const dealerName =
+                JSON.stringify(dealer.name);
+
+            tableBody.innerHTML += `
+                <tr>
+                    <td>${dealer.id}</td>
+
+                    <td>
+                        <a href="#"
+                           onclick='fetchDealerReviews(${dealer.id}, ${dealerName})'>
+                           ${dealer.name}
+                        </a>
+                    </td>
+
+                    <td>${dealer.city}</td>
+                </tr>
+            `;
+        });
+
+    }
+    catch(error){
+        console.error(error);
+    }
+}
+
+
+/* ===========================
+   STATE FILTER
+=========================== */
+function handleStateChange(state){
+
+    if(state){
+
+        window.history.pushState(
+            {},
+            '',
+            `/djangoapp/dealers/${state.replace(" ","_")}`
+        );
+
+        fetchDealers(state);
+
+    }else{
+
+        window.history.pushState(
+            {},
+            '',
+            '/djangoapp/'
+        );
+
+        fetchDealers();
+    }
+}
+
+
+/* ===========================
+   FETCH REVIEWS
+=========================== */
+async function fetchDealerReviews(
+    dealerId,
+    dealerName
+){
+
+    try{
+
+        currentDealerId = dealerId;
+
+        window.history.pushState(
+            {},
+            '',
+            `/djangoapp/dealer/${dealerId}`
+        );
+
+        document.getElementById(
+            "dealer-name-title"
+        ).innerText =
+            `Reviews for ${dealerName}`;
+
+        const response =
+            await fetch(
+                `/djangoapp/get_reviews/${dealerId}`
+            );
+
+        const reviews =
+            await response.json();
+
+        const reviewsList =
+            document.getElementById(
+                "reviews-list"
+            );
+
+        reviewsList.innerHTML = "";
+
+        if(reviews.length === 0){
+
+            reviewsList.innerHTML =
+                `
+                <p class="text-muted px-3">
+                    No reviews available.
+                </p>
+                `;
+
+        }else{
+
+            reviews.forEach(rev => {
+
+                reviewsList.innerHTML += `
+                    <div class="col-md-6 mb-3">
+
+                        <div class="card h-100 shadow-sm">
+
+                            <div class="card-body">
+
+                                <h5 class="card-title text-primary">
+                                    ${rev.name}
+                                </h5>
+
+                                <p class="card-text">
+                                    "${rev.review}"
+                                </p>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+                `;
+            });
+        }
+
+        showSection("reviews-section");
+
+    }
+    catch(error){
+        console.error(error);
+    }
+}
+
+
+/* ===========================
+   LOGIN
+=========================== */
+async function handleLogin(){
+
+    const username =
+        document.getElementById(
+            "username"
+        ).value;
+
+    const password =
+        document.getElementById(
+            "password"
+        ).value;
+
+    try{
+
+        const response =
+            await fetch(
+                "/djangoapp/login",
+                {
+                    method:"POST",
+                    headers:{
+                        "Content-Type":"application/json"
+                    },
+                    body:JSON.stringify({
+                        username,
+                        password
+                    })
+                }
+            );
+
+        if(response.ok){
+
+            document.getElementById(
+                "auth-status"
+            ).innerHTML = `
+                <span class="me-2">
+                    Welcome ${username}
+                </span>
+
+                <button class="btn btn-danger btn-sm"
+                        onclick="handleLogout()">
+                    Logout
+                </button>
+            `;
+
+            showSection("dealers-section");
+
+        }else{
+            alert("Login failed");
+        }
+
+    }catch(error){
+        console.error(error);
+    }
+}
+
+
+/* ===========================
+   LOGOUT
+=========================== */
+async function handleLogout(){
+
+    await fetch("/djangoapp/logout");
+
+    document.getElementById(
+        "auth-status"
+    ).innerHTML = `
+        <button class="btn btn-outline-primary btn-sm"
+                onclick="showSection('login-section')">
+            Login
+        </button>
+    `;
+
+    alert("Logged out successfully");
+}
+
+
+/* ===========================
+   SUBMIT REVIEW
+=========================== */
+// 5. Xử lý giả lập thêm Review mới vào danh sách (Task 22)
+function submitNewReview() {
+
+    const name =
+        document.getElementById('reviewer-name').value;
+
+    const text =
+        document.getElementById('reviewer-text').value;
+
+    if (!name || !text) {
+        alert("Please fill in all fields!");
+        return;
+    }
+
+    // Tạo card review mới
+    const reviewsList =
+        document.getElementById('reviews-list');
+
+    const newCard = `
+        <div class="col-md-6 mb-3">
+            <div class="card h-100 shadow-sm border-success">
+                <div class="card-body">
+
+                    <span class="badge bg-success float-end">
+                        New
+                    </span>
+
+                    <h5 class="card-title text-success">
+                        ${name}
+                    </h5>
+
+                    <p class="card-text">
+                        "${text}"
+                    </p>
+
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Chèn review mới lên đầu danh sách
+    reviewsList.insertAdjacentHTML(
+        'afterbegin',
+        newCard
+    );
+
+    // Quay về màn hình review
+    showSection('reviews-section');
+
+    alert("Review posted successfully!");
+}   
+
+
+/* ===========================
+   PAGE LOAD
+=========================== */
+window.addEventListener(
+    "load",
+    () => {
+
+        const pathSegments =
+            window.location.pathname.split("/");
+
+        const dealersIndex =
+            pathSegments.indexOf(
+                "dealers"
+            );
+
+        if(
+            dealersIndex !== -1 &&
+            pathSegments[dealersIndex + 1]
+        ){
+
+            const state =
+                pathSegments[
+                    dealersIndex + 1
+                ].replace(
+                    "_",
+                    " "
+                );
+
+            document.getElementById(
+                "state-filter"
+            ).value = state;
+
+            fetchDealers(state);
+
+        }else{
+            fetchDealers();
+        }
+    }
+);
+
+</script>
+
+</body>
+</html>
